@@ -24,4 +24,5 @@ jenkins+docker+ansible
   other_args="-g /data/AEData/docker --insecure-registry 192.168.0.151:5000"
   
   
-  
+  docker rmi repo
+  docker tag -f src dest
