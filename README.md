@@ -73,5 +73,151 @@ vi /etc/sysconfig/jenkins #修改java 路径 以及jenkins home路径 以及jenk
 service jenkins start
 chkconfig jenkins on
 ```
+安装maven 并配置maven私服 ，本环境使用了maven 3.2.5 setting.xml大致配置如下
+``` XML
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+  <pluginGroups>
+	<pluginGroup>org.mortbay.jetty</pluginGroup>
+  </pluginGroups>
+  <proxies>
+  </proxies>
+  <servers>
+      <server>
+      <id>snapshots</id>
+      <username>admin</username>
+      <password>admin</password>
+    </server>
+     <server>
+      <id>releases</id>
+      <username>admin</username>
+      <password>admin</password>
+     </server>
+  </servers>
+  <mirrors>
+ <mirror>
+		<id>Nexus</id>
+		<name>Nexus Public Mirror</name>
+		<url>http://192.168.0.34:8081/nexus/content/groups/public</url>
+		<mirrorOf>central</mirrorOf>
+	</mirror>
+  </mirrors>
+  <profiles>
+ 	  <profile>  
+			<id>dev</id>  
+			<repositories>  
+				  <repository>  
+					<id>local-nexus</id>  
+					<url>http://192.168.0.34:8081/nexus/content/groups/public/</url>  
+					<releases>  
+					  <enabled>true</enabled>  
+					</releases>  
+					<snapshots>  
+					  <enabled>true</enabled>  
+					</snapshots>  
+				  </repository>  
+			</repositories>  
+	  </profile> 
+
+	  <profile>  
+			<id>releases</id>  
+			<repositories>  
+				  <repository>  
+					<id>Releases</id>  
+					<url>http://192.168.0.34:8081/nexus/content/repositories/releases/</url>  
+					<releases>  
+					  <enabled>true</enabled>  
+					</releases>  
+					<snapshots>  
+					  <enabled>true</enabled>  
+					</snapshots>  
+				  </repository>  
+			</repositories>  
+	  </profile> 
+  </profiles>
+ <activeProfiles>
+        <activeProfile>dev</activeProfile>
+    </activeProfiles>
+</settings>
+
+```
+
+安装 Ansible 和docker-py
+``` Bash
+yum install ansible -y
+pip install docker-py==1.4.0
+#注意 这里docker-py需要和docker版本相对照 否则会报错. 
+#安装完以后在实际运行中会报 DEFAULT_DOCKER_API_VERSION 未定义的错误 修改
+vi /usr/lib/python2.6/site-packages/ansible/modules/core/cloud/docker/docker.py #在 大约355行增加如下内容
+
+DEFAULT_DOCKER_API_VERSION = None 
+
+```
+
+在 `192.168.0.150` 上安装dokcer-py 安装方法参照 上文
+
+设置 `192.168.0.151` ssh免密码登录 `192.168.0.150` 
+
+在 `192.168.0.151` 上设置下Ansible的hosts 和增加一个playbook 用于部署
+``` BASH
+vi /etc/ansible/hosts 
+#add hosts
+192.168.0.150
+#end
+cat > task-playbook.yml<<EOF
+---
+
+- hosts: "{{host}}"
+  tasks:
+    - name: stop docker images
+      docker:
+        name: "{{POM_ARTIFACTID}}_{{InsID}}"
+        registry: "192.168.0.151:5000"
+        image: "bojoy/{{POM_ARTIFACTID}}"
+        state: absent
+    - name: pull the latest version
+      docker:
+        pull: "always"
+        image: "192.168.0.151:5000/bojoy/{{POM_ARTIFACTID}}"
+        name: "{{POM_ARTIFACTID}}_{{InsID}}"
+        state: started
+        restart_policy: always
+        ports: "{{Ports}}"
+        volumes:
+          - /data/tomcatlogs/{{POM_ARTIFACTID}}_{{InsID}}:/usr/local/tomcat-6.0.45/logs:rw
+ EOF
+
+#因为我们需要把tomcat的日志保留 所以映射了一个本地目录到容器
+```
+
+制作自己的docker基础镜像
+```
+yum install febootstrap -y
+febootstrap -i centos-release -i vim -i lrzsz  -i tar -i coreutils -i yum -i shadow-utils -i initscripts   centos6x /root/centos6  http://mirrors.163.com/centos/6/os/x86_64/
+#生成docker镜像
+tar -c .|docker import – 192.168.0.151:5000/centos6-base
+docker push  192.168.0.151:5000/centos6-base
+```
+
+制作tomcat+java环境镜像
+``` BASH
+FROM centos6-base
+MAINTAINER Haifeng <smhchf@gmail.com>
+COPY jdk1.6.0_20 /usr/local/jdk1.6.0_20
+COPY tomcat-6.0.45 /usr/local/tomcat-6.0.45
+RUN useradd tomcat
+RUN chown -R tomcat.tomcat /usr/local/tomcat-6.0.45
+ENV JAVA_HOME /usr/local/jdk1.6.0_20
+USER tomcat
+EXPOSE 8080
+WORKDIR /usr/local/tomcat-6.0.45/bin
+CMD ./startup.sh && tail -f ../logs/catalina.out
+
+```
+docker  build -t  192.168.0.151:5000/bojoy/centos6-tomcat .
+
+
   docker rmi repo
   docker tag -f src dest
