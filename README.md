@@ -216,7 +216,49 @@ WORKDIR /usr/local/tomcat-6.0.45/bin
 CMD ./startup.sh && tail -f ../logs/catalina.out
 
 ```
+>  注意 CMD ./startup.sh && tail -f ../logs/catalina.out  也可以用 CMD ['catalina.sh','run'] 但是其日志都会输出到标准输出，不方便收集
+>  未深入研究
+
 docker  build -t  192.168.0.151:5000/bojoy/centos6-tomcat .
+
+docker push 192.168.0.151:5000/bojoy/centos6-tomcat
+
+安装Jenkins 
+到Jenkins官网下载最新的安装包 redhat系列rpm安装包地址 http://pkg.jenkins-ci.org/redhat-stable/
+rpm -Uvh http://pkg.jenkins-ci.org/redhat-stable/jenkins-1.651.1-1.1.noarch.rpm
+注意 jenkins需要 jdk 1.7以上支持
+安装完成以后
+service jenkins start
+chkconfig jenkins on
+
+配置jenkins,主要配置以下内容
+1.插件的安装
+2.JDK环境
+3.maven环境
+4.添加第一个项目
+
+虽然构建使用了docker环境 但是未使用相关的docker插件 使用执行shell命令实现了docker的管理
+
+
+1. 插件的安装
+jenkins 有着丰富强大的插件库，安装插件通过 页面左侧的 "系统管理" --> "管理插件" ---> "可选插件" 进行安装
+我这边安装了以下插件:
+1.Ansible
+2.Parameterized Trigger plugin
+
+2. 环境配置
+通过页面左侧的 "系统管理" --> "系统设置" 进行配置
+主要配置添加jdk ansible maven环境 配置如下
+
+3.添加第一个项目 
+  我们的项目均为java 使用Maven构建
+  通过页面左侧的 "系统管理" --> "新建" ---> "构建一个maven项目" 并为这个项目命名 如"3in1_task"
+  点击OK J进入项目配置界面.
+  
+  我们主要配置 项目的scm的地址 maven 构建参数 脚本设置
+
+
+
 
 
   docker rmi repo
