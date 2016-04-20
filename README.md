@@ -249,6 +249,7 @@ jenkins 有着丰富强大的插件库，安装插件通过 页面左侧的 "系
 2. 环境配置
 通过页面左侧的 "系统管理" --> "系统设置" 进行配置
 主要配置添加jdk ansible maven环境 配置如下
+![sysconfig]("https://raw.githubusercontent.com/dnnis/cidocs/master/config.png")
 
 3.添加第一个项目 
   我们的项目均为java 使用Maven构建
